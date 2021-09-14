@@ -1,4 +1,4 @@
-import argparse, time, logging, os, math
+import argparse, time, logging, os, math, copy
 
 import numpy as np
 import mxnet as mx
@@ -121,6 +121,25 @@ batch_size *= max(1, num_gpus)
 context = [mx.gpu(i) for i in range(num_gpus)] if num_gpus > 0 else [mx.cpu()]
 num_workers = opt.num_workers
 
+# SJH: Add warmup
+class LinearWarmUp():
+    def __init__(self, schedule, start_lr, length):
+        """
+        schedule: a pre-initialized schedule (e.g. TriangularSchedule(min_lr=0.5, max_lr=2, cycle_length=500))
+        start_lr: learning rate used at start of the warm-up (float)
+        length: number of iterations used for the warm-up (int)
+        """
+        self.schedule = schedule
+        self.start_lr = start_lr
+        # calling mx.lr_scheduler.LRScheduler effects state, so calling a copy
+        self.finish_lr = copy.copy(schedule)(0)
+        self.length = length
+
+    def __call__(self, iteration):
+        if iteration <= self.length:
+            return iteration * (self.finish_lr - self.start_lr)/(self.length) + self.start_lr
+        else:
+            return self.schedule(iteration - self.length)
 
 lr_decay = opt.lr_decay
 lr_decay_period = opt.lr_decay_period
@@ -129,11 +148,14 @@ if opt.lr_decay_period > 0:
 else:
     lr_decay_epoch = [int(i) for i in opt.lr_decay_epoch.split(',')]
 num_batches = num_training_samples // batch_size
-lr_scheduler = LRScheduler(mode=opt.lr_mode, baselr=opt.lr,
-                           niters=num_batches, nepochs=opt.num_epochs,
-                           step=lr_decay_epoch, step_factor=opt.lr_decay, power=2,
-                           warmup_epochs=opt.warmup_epochs)
+lr_scheduler = LRScheduler(mode=opt.lr_mode, base_lr=opt.lr,
+                           iters_per_epoch=num_batches, nepochs=opt.num_epochs,
+                           step_epoch=lr_decay_epoch, step_factor=opt.lr_decay, power=2)
+                           # Maybe from an old version?
+                           # Here is how to add it back: https://mxnet.apache.org/versions/1.6/api/python/docs/tutorials/packages/gluon/training/learning_rates/learning_rate_schedules_advanced.html
+                           # warmup_epochs=opt.warmup_epochs)
 
+lr_scheduler = LinearWarmUp(lr_scheduler, opt.lr/10.0, opt.warmup_epochs*num_batches)
 model_name = opt.model
 
 kwargs = {'ctx': context, 'pretrained': opt.use_pretrained, 'classes': classes}
@@ -162,7 +184,7 @@ net.cast(opt.dtype)
 
 
 
-if opt.resume_params is not '':
+if opt.resume_params != '':
     net.load_parameters(opt.resume_params, ctx = context)
 
 # Two functions for reading data from record file or raw images
@@ -323,7 +345,7 @@ def test(ctx, val_data):
 def train(ctx):
     if isinstance(ctx, mx.Context):
         ctx = [ctx]
-    if opt.resume_params is '':
+    if opt.resume_params == '':
         net.initialize(mx.init.MSRAPrelu(), ctx=ctx)
 
     if opt.no_wd:
@@ -332,7 +354,7 @@ def train(ctx):
 
     trainer = gluon.Trainer(net.collect_params(), optimizer, optimizer_params)
 #    trainer1 = gluon.Trainer(net.collect_params(), optimizer, optimizer_params)
-    if opt.resume_states is not '':
+    if opt.resume_states != '':
         trainer.load_states(opt.resume_states)
 
     if opt.label_smoothing or opt.mixup:
@@ -380,7 +402,8 @@ def train(ctx):
                 l.backward()
 
 
-            lr_scheduler.update(i, epoch)
+            # lr_scheduler.update(i, epoch)
+            # lr_scheduler.update(i*epoch)
             trainer.step(batch_size)
 
             if opt.mixup:
