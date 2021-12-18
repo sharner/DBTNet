@@ -1,4 +1,4 @@
-import argparse, time, logging, os, math
+import argparse, time, logging, os, math, copy
 
 import numpy as np
 import mxnet as mx
@@ -51,7 +51,7 @@ parser.add_argument('--lr-decay', type=float, default=0.1,
                     help='decay rate of learning rate. default is 0.1.')
 parser.add_argument('--lr-decay-period', type=int, default=0,
                     help='interval for periodic learning rate decays. default is 0 to disable.')
-parser.add_argument('--lr-decay-epoch', type=str, default='400,700,900',
+parser.add_argument('--lr-decay-epoch', type=str, default='40,60',
                     help='epoches at which learning rate decays. default is 40,60.')
 parser.add_argument('--warmup-lr', type=float, default=0.0,
                     help='starting warmup learning rate. default is 0.0.')
@@ -63,7 +63,7 @@ parser.add_argument('--mode', type=str,
                     help='mode in which to train the model. options are symbolic, imperative, hybrid')
 parser.add_argument('--model', type=str, required=True,
                     help='type of model to use. see vision_model for options.')
-parser.add_argument('--input-size', type=int, default=448,
+parser.add_argument('--input-size', type=int, default=224,
                     help='size of the input image size. default is 224')
 parser.add_argument('--crop-ratio', type=float, default=0.875,
                     help='Crop ratio during validation. default is 0.875')
@@ -113,14 +113,33 @@ logger.info(opt)
 batch_size_per_gpu = opt.batch_size
 input_size = opt.input_size
 classes = 1000
-num_training_samples = 5994
-
+num_training_samples = 1281167
 batch_size = opt.batch_size
+
 num_gpus = opt.num_gpus
 batch_size *= max(1, num_gpus)
 context = [mx.gpu(i) for i in range(num_gpus)] if num_gpus > 0 else [mx.cpu()]
 num_workers = opt.num_workers
 
+# SJH: Add warmup
+class LinearWarmUp():
+    def __init__(self, schedule, start_lr, length):
+        """
+        schedule: a pre-initialized schedule (e.g. TriangularSchedule(min_lr=0.5, max_lr=2, cycle_length=500))
+        start_lr: learning rate used at start of the warm-up (float)
+        length: number of iterations used for the warm-up (int)
+        """
+        self.schedule = schedule
+        self.start_lr = start_lr
+        # calling mx.lr_scheduler.LRScheduler effects state, so calling a copy
+        self.finish_lr = copy.copy(schedule)(0)
+        self.length = length
+
+    def __call__(self, iteration):
+        if iteration <= self.length:
+            return iteration * (self.finish_lr - self.start_lr)/(self.length) + self.start_lr
+        else:
+            return self.schedule(iteration - self.length)
 
 lr_decay = opt.lr_decay
 lr_decay_period = opt.lr_decay_period
@@ -129,11 +148,14 @@ if opt.lr_decay_period > 0:
 else:
     lr_decay_epoch = [int(i) for i in opt.lr_decay_epoch.split(',')]
 num_batches = num_training_samples // batch_size
-lr_scheduler = LRScheduler(mode=opt.lr_mode, baselr=opt.lr,
-                           niters=num_batches, nepochs=opt.num_epochs,
-                           step=lr_decay_epoch, step_factor=opt.lr_decay, power=2,
-                           warmup_epochs=opt.warmup_epochs)
+lr_scheduler = LRScheduler(mode=opt.lr_mode, base_lr=opt.lr,
+                           iters_per_epoch=num_batches, nepochs=opt.num_epochs,
+                           step_epoch=lr_decay_epoch, step_factor=opt.lr_decay, power=2)
+                           # Maybe from an old version?
+                           # Here is how to add it back: https://mxnet.apache.org/versions/1.6/api/python/docs/tutorials/packages/gluon/training/learning_rates/learning_rate_schedules_advanced.html
+                           # warmup_epochs=opt.warmup_epochs)
 
+lr_scheduler = LinearWarmUp(lr_scheduler, opt.lr/10.0, opt.warmup_epochs*num_batches)
 model_name = opt.model
 
 kwargs = {'ctx': context, 'pretrained': opt.use_pretrained, 'classes': classes}
@@ -152,18 +174,15 @@ if opt.dtype != 'float32':
 
 #del kwargs['use_se']
 #net = get_model(model_name, **kwargs)
-#net = dbt(**kwargs)
 net = dbt(num_layers = 50, batch_size=batch_size_per_gpu, width=input_size, **kwargs)
 #net.collect_params().cast('float16')
 
-net.cast('float16')
+#for p in net.collect_params().values():
+#    p.grad_req = 'add'
 
 ft_params = '../model/params_imagenet_dbt/dbt_imagenet.params'
 net.load_parameters(ft_params, ctx=context, allow_missing=True,  ignore_extra=True)
 classes = 200 
-
-
-
 
 with net.name_scope():
     newoutput = nn.HybridSequential(prefix='')
@@ -174,7 +193,7 @@ net.collect_params().reset_ctx(context)
 net.hybridize()
 
 net.cast(opt.dtype)
-if opt.resume_params is not '':
+if opt.resume_params != '':
     net.load_parameters(opt.resume_params, ctx = context)
 
 # Two functions for reading data from record file or raw images
@@ -185,8 +204,7 @@ def get_data_rec(rec_train, rec_train_idx, rec_val, rec_val_idx, batch_size, num
     rec_val_idx = os.path.expanduser(rec_val_idx)
     jitter_param = 0.4
     lighting_param = 0.1
-    input_size = opt.input_size
-    crop_ratio = 0.875#opt.crop_ratio if opt.crop_ratio > 0 else 0.875
+    crop_ratio = opt.crop_ratio if opt.crop_ratio > 0 else 0.875
     resize = int(math.ceil(input_size / crop_ratio))
     mean_rgb = [123.68, 116.779, 103.939]
     std_rgb = [58.393, 57.12, 57.375]
@@ -336,7 +354,7 @@ def test(ctx, val_data):
 def train(ctx):
     if isinstance(ctx, mx.Context):
         ctx = [ctx]
-    if opt.resume_params is '':
+    if opt.resume_params == '':
         net.initialize(mx.init.MSRAPrelu(), ctx=ctx)
 
     if opt.no_wd:
@@ -345,7 +363,7 @@ def train(ctx):
 
     trainer = gluon.Trainer(net.collect_params(), optimizer, optimizer_params)
 #    trainer1 = gluon.Trainer(net.collect_params(), optimizer, optimizer_params)
-    if opt.resume_states is not '':
+    if opt.resume_states != '':
         trainer.load_states(opt.resume_states)
 
     if opt.label_smoothing or opt.mixup:
@@ -355,6 +373,7 @@ def train(ctx):
     L2 = gluon.loss.L2Loss()
 
     best_val_score = 1
+
     for epoch in range(opt.resume_epoch, opt.num_epochs):
         tic = time.time()
         if opt.use_rec:
@@ -362,7 +381,6 @@ def train(ctx):
         train_metric.reset()
         btic = time.time()
         flag = True
-
         for i, batch in enumerate(train_data):
             data, label = batch_fn(batch, ctx)
 
@@ -388,10 +406,13 @@ def train(ctx):
                 regs = [tmp[1] for tmp in myoutputs]
                 regs_ = [tmp[1]*0 for tmp in myoutputs]
      
-                loss = [L(yhat, y.astype(opt.dtype, copy=False)) + 0.00001*L2(reg, reg_.astype(opt.dtype, copy=False)) for yhat, y, reg, reg_ in zip(outputs, label, regs, regs_)]
+                loss = [L(yhat, y.astype(opt.dtype, copy=False)) + 0.0003*L2(reg, reg_.astype(opt.dtype, copy=False)) for yhat, y, reg, reg_ in zip(outputs, label, regs, regs_)]
             for l in loss:
                 l.backward()
-            lr_scheduler.update(i, epoch)
+
+
+            # lr_scheduler.update(i, epoch)
+            # lr_scheduler.update(i*epoch)
             trainer.step(batch_size)
 
             if opt.mixup:
@@ -425,6 +446,14 @@ def train(ctx):
             net.save_parameters('%s/%.4f-imagenet-%s-%d-best.params'%(save_dir, best_val_score, model_name, epoch))
             trainer.save_states('%s/%.4f-imagenet-%s-%d-best.states'%(save_dir, best_val_score, model_name, epoch))
 
+        if save_frequency and save_dir and (epoch + 1) % save_frequency == 0:
+            net.save_parameters('%s/imagenet-%s-%d.params'%(save_dir, model_name, epoch))
+            trainer.save_states('%s/imagenet-%s-%d.states'%(save_dir, model_name, epoch))
+
+    if save_frequency and save_dir:
+        net.save_parameters('%s/imagenet-%s-%d.params'%(save_dir, model_name, opt.num_epochs-1))
+        trainer.save_states('%s/imagenet-%s-%d.states'%(save_dir, model_name, opt.num_epochs-1))
+
 def main():
     if opt.mode == 'hybrid':
         net.hybridize(static_alloc=True, static_shape=True)
@@ -432,5 +461,4 @@ def main():
 
 if __name__ == '__main__':
     main()
-
 
