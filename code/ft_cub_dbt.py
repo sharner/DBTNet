@@ -177,6 +177,8 @@ if opt.dtype != 'float32':
 net = dbt(num_layers = 50, batch_size=batch_size_per_gpu, width=input_size, **kwargs)
 #net.collect_params().cast('float16')
 
+net.cast('float16')
+
 #for p in net.collect_params().values():
 #    p.grad_req = 'add'
 
