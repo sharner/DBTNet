@@ -3,9 +3,9 @@ python3 ft_cub_dbt.py \
   --rec-val ../data/cub/val.rec --rec-val-idx ../data/cub/val.idx \
   --model resnet50 --mode hybrid \
   --lr 0.05 --lr-mode cosine --num-epochs 1000 --batch-size 16 --num-gpus 2 -j 12 --crop-ratio 0.875\
+  --nclasses 200\
+  --num-training-samples 5994\
   --warmup-epochs 0 --dtype float16 \
   --use-rec --no-wd --label-smoothing --last-gamma \
   --save-dir ../model/params_cub_dbt \
   --logging-file ../model/log/cub_dbt.log 
-
-

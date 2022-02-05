@@ -97,6 +97,8 @@ parser.add_argument('--log-interval', type=int, default=50,
                     help='Number of batches to wait before logging.')
 parser.add_argument('--logging-file', type=str, default='train_imagenet.log',
                     help='name of training log file')
+parser.add_argument('--num-training-samples', type=int, default=1281167, help='number of training samples')
+parser.add_argument('--nclasses', type=int, default=1000, help='number of classes')
 opt = parser.parse_args()
 
 
@@ -112,8 +114,8 @@ logger.info(opt)
 
 batch_size_per_gpu = opt.batch_size
 input_size = opt.input_size
-classes = 1000
-num_training_samples = 1281167
+classes = opt.nclasses
+num_training_samples = opt.num_training_samples
 batch_size = opt.batch_size
 
 num_gpus = opt.num_gpus
@@ -184,7 +186,7 @@ net.cast('float16')
 
 ft_params = '../model/params_imagenet_dbt/dbt_imagenet.params'
 net.load_parameters(ft_params, ctx=context, allow_missing=True,  ignore_extra=True)
-classes = 200 
+# classes = 200 
 
 with net.name_scope():
     newoutput = nn.HybridSequential(prefix='')
