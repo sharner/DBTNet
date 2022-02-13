@@ -114,7 +114,7 @@ logger.info(opt)
 
 batch_size_per_gpu = opt.batch_size
 input_size = opt.input_size
-classes = opt.nclasses
+classes = 1000 # number of classes in imagenet parameters
 num_training_samples = opt.num_training_samples
 batch_size = opt.batch_size
 
@@ -186,6 +186,7 @@ net.cast('float16')
 
 ft_params = '../model/params_imagenet_dbt/dbt_imagenet.params'
 net.load_parameters(ft_params, ctx=context, allow_missing=True,  ignore_extra=True)
+classes = opt.nclasses # number of classes for fine-tuning
 # classes = 200 
 
 with net.name_scope():
