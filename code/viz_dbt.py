@@ -62,7 +62,8 @@ opt = parser.parse_args()
 
 model_name = opt.model
 input_size = opt.input_size
-classes = 1000
+classes = opt.nclasses
+classes = 200 # workaround
 num_training_samples = opt.num_training_samples
 batch_size_per_gpu = opt.batch_size
 batch_size = opt.batch_size
@@ -86,9 +87,7 @@ net = dbt(num_layers = 50, batch_size=batch_size_per_gpu, width=input_size, **kw
 
 net.cast('float16')
 
-ft_params = '../model/params_imagenet_dbt/dbt_imagenet.params'
-net.load_parameters(ft_params, ctx=context, allow_missing=True,  ignore_extra=True)
-classes = opt.nclasses
+net.load_parameters(opt.parameters, ctx=context, allow_missing=True,  ignore_extra=True)
 # classes = 200 
 
 with net.name_scope():
@@ -232,9 +231,12 @@ def train(ctx):
 
 def display(context):
     for batch in val_data:
-        print(batch.data)
-        viz.plot_image(nd.transpose(batch.data[0][12], (1, 2, 0)))
-        viz.plot_image(nd.transpose(batch.data[0][21], (1, 2, 0)))
+        for idx in range(batch.data[0].shape[0]):
+            matrix = nd.NDArray.asnumpy(batch.label[0][idx])
+            print("index {} label is {}".format(idx, matrix.item()))
+            img = nd.NDArray.asnumpy(batch.data[0][idx])
+            plt.imshow(np.transpose(img, (1, 2, 0)))
+            plt.savefig("figure{}.png".format(idx))
         break
 
 def main():
