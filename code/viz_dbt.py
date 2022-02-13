@@ -232,9 +232,7 @@ def train(ctx):
 
 def display(context):
     for batch in val_data:
-        print(batch.data)
-        viz.plot_image(nd.transpose(batch.data[0][12], (1, 2, 0)))
-        viz.plot_image(nd.transpose(batch.data[0][21], (1, 2, 0)))
+        print(batch.data[0].shape, batch.label[0])
         break
 
 def main():
