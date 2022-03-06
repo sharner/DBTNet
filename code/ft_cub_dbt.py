@@ -87,6 +87,8 @@ parser.add_argument('--save-frequency', type=int, default=10,
                     help='frequency of model saving.')
 parser.add_argument('--save-dir', type=str, default='params',
                     help='directory of saved models')
+parser.add_argument('--export-model', action='store_true',
+                    help='Export model and parameters (default False)')
 parser.add_argument('--resume-epoch', type=int, default=0,
                     help='epoch to resume training from.')
 parser.add_argument('--resume-params', type=str, default='',
@@ -356,6 +358,13 @@ def test(ctx, val_data):
     _, top5 = acc_top5.get()
     return (1-top1, 1-top5)
 
+def save_model(net, base_file_name, epoch, do_export_model=False):
+    """Save the parameters and states.  Optionally export the model"""
+    if not do_export_model:
+        net.save_parameters('{}-{}.params'.format(base_file_name, epoch))
+    else:
+        net.export(base_file_name, epoch)
+        
 def train(ctx):
     if isinstance(ctx, mx.Context):
         ctx = [ctx]
@@ -380,6 +389,7 @@ def train(ctx):
     best_val_score = 1
 
     for epoch in range(opt.resume_epoch, opt.num_epochs):
+        do_export_model = opt.export_model and epoch == opt.num_epochs-1
         tic = time.time()
         if opt.use_rec:
             train_data.reset()
@@ -448,15 +458,18 @@ def train(ctx):
 
         if err_top1_val < best_val_score:
             best_val_score = err_top1_val
-            net.save_parameters('%s/%.4f-imagenet-%s-%d-best.params'%(save_dir, best_val_score, model_name, epoch))
+            bfn = '%s/%.4f-imagenet-%s-best'%(save_dir, best_val_score, model_name)
+            save_model(net, bfn, epoch, do_export_model)
             trainer.save_states('%s/%.4f-imagenet-%s-%d-best.states'%(save_dir, best_val_score, model_name, epoch))
 
         if save_frequency and save_dir and (epoch + 1) % save_frequency == 0:
-            net.save_parameters('%s/imagenet-%s-%d.params'%(save_dir, model_name, epoch))
+            bfn = '%s/imagenet-%s'%(save_dir, model_name)
+            save_model(net, bfn, epoch, do_export_model)
             trainer.save_states('%s/imagenet-%s-%d.states'%(save_dir, model_name, epoch))
 
     if save_frequency and save_dir:
-        net.save_parameters('%s/imagenet-%s-%d.params'%(save_dir, model_name, opt.num_epochs-1))
+        bfn = '%s/imagenet-%s'%(save_dir, model_name)
+        save_model(net, bfn, epoch, do_export_model)
         trainer.save_states('%s/imagenet-%s-%d.states'%(save_dir, model_name, opt.num_epochs-1))
 
 def main():
