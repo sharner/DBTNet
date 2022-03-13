@@ -86,8 +86,6 @@ net.cast('float16')
 #for p in net.collect_params().values():
 #    p.grad_req = 'add'
 
-ft_params = '../model/params_imagenet_dbt/dbt_imagenet.params'
-net.load_parameters(ft_params, ctx=context, allow_missing=True,  ignore_extra=True)
 classes = opt.nclasses # number of classes for fine-tuning
 # classes = 200 
 
