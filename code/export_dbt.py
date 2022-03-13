@@ -44,7 +44,7 @@ parser.add_argument('--batch-norm', action='store_true',
 parser.add_argument('--logging-file', type=str, default='export_imagenet.log',
                     help='name of training log file')
 parser.add_argument('--nclasses', type=int, default=1000, help='number of classes')
-parser.add_argument('-j', '--num-data-workers', dest='num_workers', default=4, type=int,
+parser.add_argument('-j', '--num-data-workers', dest='num_workers', default=0, type=int,
                     help='number of preprocessing workers')
 opt = parser.parse_args()
 
