@@ -44,8 +44,6 @@ parser.add_argument('--batch-norm', action='store_true',
 parser.add_argument('--logging-file', type=str, default='export_imagenet.log',
                     help='name of training log file')
 parser.add_argument('--nclasses', type=int, default=1000, help='number of classes')
-parser.add_argument('-j', '--num-data-workers', dest='num_workers', default=0, type=int,
-                    help='number of preprocessing workers')
 opt = parser.parse_args()
 
 
@@ -86,6 +84,8 @@ net.cast('float16')
 #for p in net.collect_params().values():
 #    p.grad_req = 'add'
 
+ft_params = '../model/params_imagenet_dbt/dbt_imagenet.params'
+net.load_parameters(ft_params, ctx=context, allow_missing=True,  ignore_extra=True)
 classes = opt.nclasses # number of classes for fine-tuning
 # classes = 200 
 
