@@ -8,6 +8,7 @@ RUN git clone --recurse-submodules https://github.com/onnx/onnx-tensorrt.git \
     && cd ../.. && rm -rf onnx-tensorrt
 
 RUN pip install \
-    gluoncv
+    gluoncv \
+    onnx
 
 

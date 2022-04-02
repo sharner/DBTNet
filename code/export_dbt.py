@@ -85,7 +85,7 @@ net.cast('float16')
 #    p.grad_req = 'add'
 
 ft_params = '../model/params_imagenet_dbt/dbt_imagenet.params'
-net.load_parameters(ft_params, ctx=context, allow_missing=True,  ignore_extra=True)
+#net.load_parameters(ft_params, ctx=context, allow_missing=True,  ignore_extra=True)
 classes = opt.nclasses # number of classes for fine-tuning
 # classes = 200 
 
@@ -94,7 +94,7 @@ with net.name_scope():
     newoutput.add(nn.Conv2D(classes, kernel_size=1, padding=0, use_bias=True))
     net.myoutput = newoutput#nn.Conv2D(classes, kernel_size=3, padding=1, use_bias=True)#nn.Dense(classes)
 net.myoutput[0].initialize(mx.init.Xavier(), ctx = context)
-net.collect_params().reset_ctx(context)
+#net.collect_params().reset_ctx(context)
 net.hybridize()
 
 net.cast(opt.dtype)

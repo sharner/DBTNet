@@ -360,6 +360,7 @@ def test(ctx, val_data):
 
 def save_model(net, base_file_name, epoch, do_export_model=False):
     """Save the parameters and states.  Optionally export the model"""
+    print("do export {} epoch {} bfn {}".format(do_export_model, epoch, base_file_name))
     if not do_export_model:
         net.save_parameters('{}-{}.params'.format(base_file_name, epoch))
     else:
