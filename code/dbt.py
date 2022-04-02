@@ -91,6 +91,15 @@ class Position2(mx.init.Initializer):
     sinusoid_table[:, 1::2] = np.cos(sinusoid_table[:, 1::2])  # dim 2i+1
     arr[:] = sinusoid_table.flat
 
+def L2Normalization_rep(F, var, width):
+  """Plug replacement for mxnet.sym.L2Normalization(mode='instance')
+  for onnx conversion."""
+  resh = var.reshape((-1, width*width))
+  div1 = resh.norm(ord=2, axis=1) + 1.0e-10
+  mult = 1./div1.reshape((1, -1)).transpose()
+  result = F.broadcast_mul(var.reshape((-1, width*width)), mult)
+  return result
+
 class GB2HybridLayer(gluon.HybridBlock):
     def __init__(self, groups, per_group, width, myname):
         super(GB2HybridLayer, self).__init__()
@@ -214,7 +223,8 @@ class GroupConv(nn.Conv2D):
         act = self.body(act)
         act = F.Activation(data=act,act_type ='relu')
         tmp = act+0.001
-        tmp = F.L2Normalization(tmp.reshape((-1,width*width)), mode='instance')
+        #tmp = F.L2Normalization(tmp.reshape((-1,width*width)), mode='instance')
+        tmp = L2Normalization_rep(F, tmp, width)
         tmp = F.transpose(tmp.reshape((-1,channels,width*width)),axes=(1,0,2)).reshape((channels,-1))
         co = F.dot(tmp,tmp,False,True).reshape((1,channels*channels))/self.batch_size
 #        tmp = tmp.reshape((-1,channels,width*width)).astype('float32')
@@ -244,7 +254,8 @@ class GroupConv2(nn.Conv2D):
         act = self.body(act)
         act = F.Activation(data=act,act_type ='relu')
         tmp = act+0.001
-        tmp = F.L2Normalization(tmp.reshape((-1,width*width)), mode='instance')
+        #tmp = F.L2Normalization(tmp.reshape((-1,width*width)), mode='instance')
+        tmp = L2Normalization_rep(F, tmp, width)
         tmp = F.transpose(tmp.reshape((-1,channels,width*width)),axes=(1,0,2)).reshape((channels,-1))
         co = F.dot(tmp,tmp,False,True).reshape((1,channels*channels))/self.batch_size
 #        tmp = tmp.reshape((-1,channels,width*width)).astype('float32')
