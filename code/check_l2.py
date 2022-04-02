@@ -25,12 +25,14 @@ def check_l2(array, width, num_gpus=0):
     tmp1 = mx.sym.broadcast_mul(tmp1.reshape((-1,width*width)), mult)
     diff = tmp - tmp1
     e = diff.bind(ctx[0], {'tmp':arr})
-    e1 = tmp.bind(ctx[0], {'tmp':arr})
-    e2 = tmp1.bind(ctx[0], {'tmp':arr})
+
+    d1 = mx.sym.ones(16).diag()
+    d2 = mx.sym.linalg_makediag(mx.sym.ones(16))
+    diff1 = d1 - d2
+    e1 = diff1.bind(ctx[0], {})
     y = e.forward()
     y1 = e1.forward()
-    y2 = e2.forward()
-    return y, y1, y2
+    return y, y1
 
 def main(ntrials = 1000, width=224):
     passes = 0
@@ -38,11 +40,14 @@ def main(ntrials = 1000, width=224):
     eps = 1.0e-5
     for i in range(ntrials):
         next = mx.nd.random.uniform(0, 1., shape=(1, 3, width, width))
-        y, y1, y2 = check_l2(next, width)
+        y, y1 = check_l2(next, width)
         n = y[0].norm()
+        n1 = y1[0].norm()
         if n[0] > eps:
-            print('Fail: {} -> L2 {} Repl {} norm {}'.format(next, y1, y2, n[0]))
+            print('Fail: {} -> norm {}'.format(next, n[0]))
             fail += 1
+        elif n1[0] > eps:
+            print('Fail: diag diff -> norm {}'.format(n1[0]))
         else:
             passes += 1
     print('Passes {} Failures {}'.format(passes, fail))
