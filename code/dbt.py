@@ -232,8 +232,8 @@ class GroupConv(nn.Conv2D):
         co = F.dot(tmp,tmp,False,True).reshape((1,channels*channels))/self.batch_size
 #        tmp = tmp.reshape((-1,channels,width*width)).astype('float32')
 #        co = F.BatchDot(tmp,tmp).astype('float16').reshape((128,channels*channels))
-#        gt = F.tile(F.ones(groups).diag().reshape((1, 1, groups, groups)),(1, np.int((channels/groups)*(channels/groups)), 1, 1))
-        gt = F.tile(diag_rep(F, groups).reshape((1, 1, groups, groups)),(1, np.int((channels/groups)*(channels/groups)), 1, 1))
+        gt = F.tile(F.ones(groups).diag().reshape((1, 1, groups, groups)),(1, np.int((channels/groups)*(channels/groups)), 1, 1))
+#        gt = F.tile(diag_rep(F, groups).reshape((1, 1, groups, groups)),(1, np.int((channels/groups)*(channels/groups)), 1, 1))
         gt = F.depth_to_space(gt, np.int(channels/groups)).astype('float16').reshape((1,channels*channels))
         loss = F.tile(F.sum((co-gt)*(co-gt)*0.001,axis=1),(self.batch_size))/((channels/512.0)*(channels/512.0))
 #        loss = (co-gt)*(co-gt)
@@ -264,8 +264,8 @@ class GroupConv2(nn.Conv2D):
         co = F.dot(tmp,tmp,False,True).reshape((1,channels*channels))/self.batch_size
 #        tmp = tmp.reshape((-1,channels,width*width)).astype('float32')
 #        co = F.BatchDot(tmp,tmp).astype('float16').reshape((128,channels*channels))
-#        gt = F.tile(F.ones(groups).diag().reshape((1, 1, groups, groups)),(1, np.int((channels/groups)*(channels/groups)), 1, 1))
-        gt = F.tile(diag_rep(F, groups).diag().reshape((1, 1, groups, groups)),(1, np.int((channels/groups)*(channels/groups)), 1, 1))
+        gt = F.tile(F.ones(groups).diag().reshape((1, 1, groups, groups)),(1, np.int((channels/groups)*(channels/groups)), 1, 1))
+#        gt = F.tile(diag_rep(F, groups).diag().reshape((1, 1, groups, groups)),(1, np.int((channels/groups)*(channels/groups)), 1, 1))
         gt = F.depth_to_space(gt, np.int(channels/groups)).astype('float16').reshape((1,channels*channels))
         loss = F.tile(F.sum((co-gt)*(co-gt)*0.001,axis=1),(self.batch_size))/((channels/512.0)*(channels/512.0))
 #        loss = (co-gt)*(co-gt)
