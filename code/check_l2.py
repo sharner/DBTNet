@@ -12,6 +12,9 @@ symfile = "imagenet-resnet50-symbol.json"
 sf = os.path.join(pdir, symfile)
 pf = os.path.join(pdir, parfile)
 
+def diag_rep(ngroups):
+  return mx.sym.linalg_makediag(mx.sym.ones(ngroups)).reshape((1, 1, ngroups, ngroups))
+
 def check_l2(array, width, num_gpus=0):
     ctx = [mx.gpu(i) for i in range(num_gpus)] if num_gpus > 0 else [mx.cpu()]
     arr = mx.nd.array(array)
@@ -26,13 +29,22 @@ def check_l2(array, width, num_gpus=0):
     diff = tmp - tmp1
     e = diff.bind(ctx[0], {'tmp':arr})
 
-    d1 = mx.sym.ones(16).diag()
-    d2 = mx.sym.linalg_makediag(mx.sym.ones(16))
-    diff1 = d1 - d2
+    groups = 16
+    channels = 100
+    cdg = np.int((channels/groups)*(channels/groups))
+    
+    d1 = mx.sym.ones(groups).diag().reshape((1, 1, groups, groups))
+    d11 = mx.sym.tile(d1, (1, cdg, 1, 1))
+    e11 = d11.bind(ctx[0], {})
+    y2 = e11.forward()
+
+    d2 = diag_rep(groups)
+    d21 = mx.sym.tile(d2, (1, cdg, 1, 1))
+    diff1 = d11 - d21
     e1 = diff1.bind(ctx[0], {})
     y = e.forward()
     y1 = e1.forward()
-    return y, y1
+    return y, y1, y2
 
 def main(ntrials = 1000, width=224):
     passes = 0
@@ -40,7 +52,7 @@ def main(ntrials = 1000, width=224):
     eps = 1.0e-5
     for i in range(ntrials):
         next = mx.nd.random.uniform(0, 1., shape=(1, 3, width, width))
-        y, y1 = check_l2(next, width)
+        y, y1, y2 = check_l2(next, width)
         n = y[0].norm()
         n1 = y1[0].norm()
         if n[0] > eps:
