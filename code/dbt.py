@@ -100,6 +100,11 @@ def L2Normalization_rep(F, var, width):
   result = F.broadcast_mul(var.reshape((-1, width*width)), mult)
   return result
 
+def diag_rep(name, ngroups):
+  const_mat = mx.ndarray.diag(mx.ndarray.ones(ngroups)).reshape((1, 1, ngroups, ngroups))
+  
+  return const_mat
+
 def diag_rep(F, ngroups):
   return F.linalg_makediag(F.ones(ngroups)).reshape((1, 1, ngroups, ngroups))
 

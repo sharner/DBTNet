@@ -14,7 +14,7 @@ parser.add_argument('--load-params', type=str, required=True,
 parser.add_argument('--load-syms', type=str, required=True,
                     help='path of symbols to load from.')
 parser.add_argument('--onnx-file', type=str, default=None,
-                    help='onnx');
+                    help='onnx', required=True);
 parser.add_argument('--input-size', type=int, default=224,
                     help='size of the input image size. default is 224')
 parser.add_argument('--nclasses', type=int, default=1000, help='number of classes')

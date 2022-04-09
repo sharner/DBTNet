@@ -12,8 +12,12 @@ symfile = "imagenet-resnet50-symbol.json"
 sf = os.path.join(pdir, symfile)
 pf = os.path.join(pdir, parfile)
 
-def diag_rep(ngroups):
-  return mx.sym.linalg_makediag(mx.sym.ones(ngroups)).reshape((1, 1, ngroups, ngroups))
+def diag_rep(name, ngroups):
+  const_mat = np.diag(np.ones(ngroups))
+  const_arr = const_mat.tolist()
+  tmp = mx.sym.Variable(name+"_weight", shape=(ngroups, ngroups), init=
+                        mx.initializer.Constant(const_mat))
+  return tmp
 
 def check_l2(array, width, num_gpus=0):
     ctx = [mx.gpu(i) for i in range(num_gpus)] if num_gpus > 0 else [mx.cpu()]
@@ -38,8 +42,7 @@ def check_l2(array, width, num_gpus=0):
     e11 = d11.bind(ctx[0], {})
     y2 = e11.forward()
 
-    d2 = diag_rep(groups)
-    d21 = mx.sym.tile(d2, (1, cdg, 1, 1))
+    d21 = mx.sym.tile(diag_rep('diag_mat', groups).reshape((1, 1, groups, groups)), (1, cdg, 1, 1))
     diff1 = d11 - d21
     e1 = diff1.bind(ctx[0], {})
     y = e.forward()
