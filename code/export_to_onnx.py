@@ -7,8 +7,6 @@ logging.basicConfig(level=logging.INFO)
 
 # CLI
 parser = argparse.ArgumentParser(description='Export given model/paramerters to ONNX')
-parser.add_argument('--model', type=str, required=True,
-                    help='type of model to use. see vision_model for options.')
 parser.add_argument('--load-params', type=str, required=True,
                     help='path of parameters to load from.')
 parser.add_argument('--load-syms', type=str, required=True,
