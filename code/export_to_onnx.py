@@ -16,6 +16,7 @@ parser.add_argument('--onnx-file', type=str, default=None,
 parser.add_argument('--input-size', type=int, default=224,
                     help='size of the input image size. default is 224')
 parser.add_argument('--nclasses', type=int, default=1000, help='number of classes')
+parser.add_argument('--opset',default=None,help'onnx opset version')
 opts = parser.parse_args()
 
 def main():
@@ -26,7 +27,9 @@ def main():
                                          opts.load_params,
                                          in_shapes,
                                          in_types,
-                                         opts.onnx_file)
+                                         opts.onnx_file,
+                                         opset=opts.opset
+)
 
 if __name__ == '__main__':
     main()

@@ -3,4 +3,5 @@ python3 export_to_onnx.py \
 	--load-syms ../model/params_n1_training_clean_dbt/imagenet-resnet50-symbol.json \
 	--onnx-file dbt.224.100.onnx \
 	--input-size 224\
-	--nclasses 457
+	--nclasses 457\
+	--opset 13
